@@ -1,4 +1,4 @@
-# Violence Detection using HOG
+# Video Classification using SIFT
 
 This program uses the SIFT algorithm to classify videos.
 
