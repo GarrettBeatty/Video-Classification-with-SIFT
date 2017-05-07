@@ -7,17 +7,13 @@ from scipy.spatial import KDTree
 from sklearn.svm import LinearSVC
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.utils import shuffle
+import argparse
 
 sift = cv2.xfeatures2d.SIFT_create()
 
 
 def get_x_y(path, positive_class):
-    """
-    
-    :param path: 
-    :param positive_class: 
-    :return: 
-    """
+
     x = []
     y = []
     for folder in os.listdir(path):
@@ -33,29 +29,22 @@ def get_x_y(path, positive_class):
 
 
 def compute_sift(image):
-    """
-    
-    :param image: 
-    :return: 
-    """
+
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     kp, des = sift.detectAndCompute(gray, None)  # keypoints, descriptors
     return des
 
 
-def calc_bow(list_videos, kdtree, bins, method='mean'):
-    """
-    
-    :param list_videos: 
-    :param kdtree: 
-    :param bins: 
-    :param method: 
-    :return: 
-    """
+def create_bow(x_features, dictionary, method, save_path):
+
+    kdtree = KDTree(dictionary)
+    bins = dictionary.shape[0]
+
     print('calculating BoW...')
     list_videos_hist = []
-    for i, video in enumerate(list_videos):
-        print('video', i + 1, 'out of', len(list_videos))
+    for i, video in enumerate(x_features):
+        print()
+        print('video', i + 1, 'out of', len(x_features))
         video_hist = []
         for j, frame in enumerate(video):
             print('Frame', j + 1, 'out of', len(video))
@@ -71,33 +60,33 @@ def calc_bow(list_videos, kdtree, bins, method='mean'):
             video_hist = np.mean(video_hist, 0)
         elif method == 'max':
             video_hist = np.amax(video_hist, 0)
-        elif method == 'mode':
-            pass
+        else:
+            raise Exception('Method not found')
 
         list_videos_hist.append(video_hist)
+
+    np.save(save_path, np.array(list_videos_hist))
 
     return np.array(list_videos_hist)
 
 
-def create_train_test(root_path, save_path, positive_class_name):
-    """
-    
-    :param root_path: 
-    :param save_path: 
-    :param positive_class_name: 
-    :return: 
-    """
-    movies_path = os.path.join(root_path, 'movies')
-
-    x, y = get_x_y(movies_path, positive_class_name)
+def get_video_train_test(x, y, save_path):
     x, y = shuffle(x, y, random_state=42)
-    # x, y = x[:5], y[:5]
+    x_train, x_test, y_train, y_test = train_test_split(x, y)
+
+    np.save(os.path.join(save_path, 'xtrainfiles'), x_train)
+    np.save(os.path.join(save_path, 'xtestfiles'), x_test)
+    np.save(os.path.join(save_path, 'ytrain.npy'), y_train)
+    np.save(os.path.join(save_path, 'ytest.npy'), y_test)
+
+    return x_train, x_test, y_train, y_test
+
+
+def create_features(x):
 
     features = []
 
-    for i, (video, label) in enumerate(zip(x, y)):
-
-        label = int(label)
+    for i, video in enumerate(x):
 
         print('video', i + 1, 'out of', len(x))
 
@@ -112,32 +101,23 @@ def create_train_test(root_path, save_path, positive_class_name):
         features.append(video_frames)
 
         print()
-        print('success', video, 'label:', label)
+        print('success', video)
         print()
 
-    x_train, x_test, y_train, y_test = train_test_split(features, y)
-    np.save(os.path.join(save_path, 'xtrain'), x_train)
-    np.save(os.path.join(save_path, 'ytrain'), y_train)
-    np.save(os.path.join(save_path, 'xtest'), x_test)
-    np.save(os.path.join(save_path, 'ytest'), y_test)
+    return features
 
 
-def create_dictionary(save_path):
-    """
-    
-    :param save_path: 
-    :return: 
-    """
+def create_dictionary(x_train_features):
+
     print('Creating dictionary...')
-    x_train = np.load(os.path.join(save_path, 'xtrain.npy'))
 
     dictionary_size = 20
     bow = cv2.BOWKMeansTrainer(dictionary_size)
 
     # for every training video add every frame to the bow
 
-    for i, video in enumerate(x_train):
-        print('video', i + 1, 'out of', len(x_train))
+    for i, video in enumerate(x_train_features):
+        print('video', i + 1, 'out of', len(x_train_features))
         num_frames = len(video)
         random_perm = np.random.permutation(num_frames)
         for i in random_perm[:5]:
@@ -145,64 +125,69 @@ def create_dictionary(save_path):
             bow.add(frame)
 
     dictionary = bow.cluster()  # compute centroids
-    np.save(os.path.join(save_path, 'dictionary'), dictionary)
-    print('dictionary shape', dictionary.shape)
+
+    return dictionary
 
 
-def create_bow(save_path):
-    """
-    
-    :param save_path: 
-    :return: 
-    """
+def load_train_test(save_path):
 
-    dictionary = np.load(os.path.join(save_path, 'dictionary.npy'))
-    x_train = np.load(os.path.join(save_path, 'xtrain.npy'))
-    x_test = np.load(os.path.join(save_path, 'xtest.npy'))
-
-    kdtree = KDTree(dictionary)
-
-    x_train_bow = calc_bow(x_train, kdtree, dictionary.shape[0])
-    x_test_bow = calc_bow(x_test, kdtree, dictionary.shape[0])
-
-    np.save(os.path.join(save_path, 'xtrainbow'), x_train_bow)
-    np.save(os.path.join(save_path, 'xtestbow'), x_test_bow)
-
-
-def generate_files(root_path, positive_class_name):
-    """
-    
-    :param root_path: 
-    :param positive_class_name: 
-    :return: 
-    """
-
-    save_path = os.path.join(root_path, 'generated')
-    os.makedirs(save_path, exist_ok=True)
-    create_train_test(root_path, save_path, positive_class_name)
-    create_dictionary(save_path)
-    create_bow(save_path)
-    predict(save_path)
-
-
-def predict(save_path):
-    """
-    
-    :param save_path: 
-    :return: 
-    """
-
-    x_train_bow = np.load(os.path.join(save_path, 'xtrainbow.npy'))
-    x_test_bow = np.load(os.path.join(save_path, 'xtestbow.npy'))
+    x_train = np.load(os.path.join(save_path, 'xtrainfiles.npy'))
+    x_test = np.load(os.path.join(save_path, 'xtestfiles.npy'))
     y_train = np.load(os.path.join(save_path, 'ytrain.npy'))
     y_test = np.load(os.path.join(save_path, 'ytest.npy'))
 
-    print(x_train_bow.shape)
-    print(y_train)
+    return x_train, x_test, y_train, y_test
+
+
+def run_from_train_test(root_path, method):
+    save_path = os.path.join(root_path, 'generated')
+    method_path = os.path.join(save_path, method)
+    x_train, x_test, y_train, y_test = load_train_test(save_path)
+    _run_from_train_test(x_train, x_test, y_train, y_test, method, method_path)
+
+
+def _run_from_train_test(x_train, x_test, y_train, y_test, method, method_path):
+
+    x_train_features = create_features(x_train)
+    x_test_features = create_features(x_test)
+
+    dictionary = create_dictionary(x_train_features)
+
+    x_train_bow = create_bow(x_train_features, dictionary, method, os.path.join(method_path, 'xtrainbow.npy'))
+    x_test_bow = create_bow(x_test_features, dictionary, method, os.path.join(method_path, 'xtestbow.npy'))
+
+    predict(x_train_bow, x_test_bow, y_train, y_test)
+
+
+def run_all(root_path, positive_class_name, method):
+
+    save_path = os.path.join(root_path, 'generated')
+    method_path = os.path.join(save_path, method)
+    movies_path = os.path.join(root_path, 'movies')
+    os.makedirs(method_path, exist_ok=True)
+
+    x, y = get_x_y(movies_path, positive_class_name)
+
+    x_train, x_test, y_train, y_test = get_video_train_test(x, y, save_path)
+
+    _run_from_train_test(x_train, x_test, y_train, y_test, method, method_path)
+
+
+def predict(x_train, x_test, y_train, y_test):
+
     model = LinearSVC()
-    model.fit(x_train_bow, y_train)
-    predictions = model.predict(x_test_bow)
+    model.fit(x_train, y_train)
+    predictions = model.predict(x_test)
     acc = accuracy_score(y_test, predictions)
     precision = precision_score(y_test, predictions)
     recall = recall_score(y_test, predictions)
-    print(acc, precision, recall)
+    print('Accuracy:', acc, 'Recall:', recall, 'Precision:', precision)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Learning Curve Analysis Research')
+    parser.add_argument('-r', '--root_folder', help='Root folder', required=True)
+    parser.add_argument('-m', '--method', help='Method', required=True)
+
+    args = parser.parse_args()
+    run_from_train_test(args.root_folder, args.method)
