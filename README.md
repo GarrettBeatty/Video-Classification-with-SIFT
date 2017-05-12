@@ -4,6 +4,8 @@ This program uses the SIFT algorithm to classify videos.
 
 ### Prerequisites
 
+16GB of ram is required if you want to run the program in full (not just doing the demo).
+
 Python3 is required.
 
 The required Python packages can be installed with 
@@ -24,10 +26,12 @@ python3 demo.py
 
 To regenerate all files and rerun the the whole program
 ```
-python3 init.py -r violentflows -m max
+python3 init.py -r violentflows -p Violence -m max
 
 ```
 -r is the root folder of the dataset.
+
+-p is the positive class name.
 
 -m is the method. (max or mean)
 

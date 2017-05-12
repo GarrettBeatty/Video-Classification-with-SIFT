@@ -1,3 +1,6 @@
+"""This module will classify videos using SIFT."""
+
+
 import cv2
 from sklearn.model_selection import train_test_split
 import os
@@ -5,7 +8,7 @@ import skvideo.io
 import numpy as np
 from scipy.spatial import KDTree
 from sklearn.svm import LinearSVC
-from sklearn.metrics import accuracy_score, precision_score, recall_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from sklearn.utils import shuffle
 import argparse
 
@@ -13,6 +16,12 @@ sift = cv2.xfeatures2d.SIFT_create()
 
 
 def get_x_y(path, positive_class):
+    """
+    
+    :param path: str
+    :param positive_class: str 
+    :return list, list: 
+    """
 
     x = []
     y = []
@@ -29,6 +38,11 @@ def get_x_y(path, positive_class):
 
 
 def compute_sift(image):
+    """
+    
+    :param image: np.array
+    :return: np.array
+    """
 
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     kp, des = sift.detectAndCompute(gray, None)  # keypoints, descriptors
@@ -36,6 +50,14 @@ def compute_sift(image):
 
 
 def create_bow(x_features, dictionary, method, save_path):
+    """
+    
+    :param x_features: np.array
+    :param dictionary: np.array
+    :param method: str
+    :param save_path: str
+    :return: np.array
+    """
 
     kdtree = KDTree(dictionary)
     bins = dictionary.shape[0]
@@ -71,6 +93,13 @@ def create_bow(x_features, dictionary, method, save_path):
 
 
 def get_video_train_test(x, y, save_path):
+    """
+    
+    :param x: list
+    :param y: list
+    :param save_path: str 
+    :return: list, list, list, list
+    """
     x, y = shuffle(x, y, random_state=42)
     x_train, x_test, y_train, y_test = train_test_split(x, y)
 
@@ -83,6 +112,11 @@ def get_video_train_test(x, y, save_path):
 
 
 def create_features(x):
+    """
+    
+    :param x: list
+    :return: list
+    """
 
     features = []
 
@@ -108,6 +142,11 @@ def create_features(x):
 
 
 def create_dictionary(x_train_features):
+    """
+    
+    :param x_train_features: np.array
+    :return: np.array
+    """
 
     print('Creating dictionary...')
 
@@ -130,6 +169,11 @@ def create_dictionary(x_train_features):
 
 
 def load_train_test(save_path):
+    """
+    
+    :param save_path: str
+    :return: np.array, np.array, np.array, np.array
+    """
 
     x_train = np.load(os.path.join(save_path, 'xtrainfiles.npy'))
     x_test = np.load(os.path.join(save_path, 'xtestfiles.npy'))
@@ -140,6 +184,11 @@ def load_train_test(save_path):
 
 
 def run_from_train_test(root_path, method):
+    """
+    
+    :param root_path: str
+    :param method: str
+    """
     save_path = os.path.join(root_path, 'generated')
     method_path = os.path.join(save_path, method)
     x_train, x_test, y_train, y_test = load_train_test(save_path)
@@ -147,6 +196,15 @@ def run_from_train_test(root_path, method):
 
 
 def _run_from_train_test(x_train, x_test, y_train, y_test, method, method_path):
+    """
+    
+    :param x_train: list
+    :param x_test: list
+    :param y_train: list
+    :param y_test: list
+    :param method: str
+    :param method_path: str 
+    """
 
     x_train_features = create_features(x_train)
     x_test_features = create_features(x_test)
@@ -160,6 +218,12 @@ def _run_from_train_test(x_train, x_test, y_train, y_test, method, method_path):
 
 
 def run_all(root_path, positive_class_name, method):
+    """
+    
+    :param root_path: str
+    :param positive_class_name: str
+    :param method: str
+    """
 
     save_path = os.path.join(root_path, 'generated')
     method_path = os.path.join(save_path, method)
@@ -173,21 +237,55 @@ def run_all(root_path, positive_class_name, method):
     _run_from_train_test(x_train, x_test, y_train, y_test, method, method_path)
 
 
+def print_incorrect_files(predictions, y_test, save_path):
+    """
+    
+    Prints the files which were classified wrong.
+    
+    :param predictions: 
+    :param y_test: 
+    :param save_path: 
+    :return: 
+    """
+    x_test = np.load(os.path.join(save_path, 'xtestfiles.npy'))
+
+    for i, (p, gt) in enumerate(zip(predictions, y_test)):
+        if p != gt:
+            print('Predicted:', p, 'Truth:', gt)
+            print(x_test[i])
+
+
 def predict(x_train, x_test, y_train, y_test):
+    """
+    
+    :param x_train: np.array
+    :param x_test: np.array
+    :param y_train: np.array
+    :param y_test: np.array
+    """
 
     model = LinearSVC()
     model.fit(x_train, y_train)
     predictions = model.predict(x_test)
+    print('Predictions')
+    print(predictions)
+    print()
+    print('Ground Truth')
+    print(y_test)
+    print()
     acc = accuracy_score(y_test, predictions)
     precision = precision_score(y_test, predictions)
     recall = recall_score(y_test, predictions)
-    print('Accuracy:', acc, 'Recall:', recall, 'Precision:', precision)
+    fmeasure = f1_score(y_test, predictions)
+    print('Accuracy:', acc, 'Recall:', recall, 'Precision:', precision, 'F-measure', fmeasure)
+    return predictions
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Learning Curve Analysis Research')
     parser.add_argument('-r', '--root_folder', help='Root folder', required=True)
+    parser.add_argument('-p', '--positive_class_name', help='Positive Class Name', required=True)
     parser.add_argument('-m', '--method', help='Method', required=True)
 
     args = parser.parse_args()
-    run_from_train_test(args.root_folder, args.method)
+    run_all(args.root_folder, args.positive_class_name, args.method)

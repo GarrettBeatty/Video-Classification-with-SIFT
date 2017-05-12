@@ -12,7 +12,7 @@ function feature_vec = VIF_create_feature_vec(path,file_name)
 	M = 4;                % number of  horisontal blocks in frame
 
 	K=4;
-
+    fullfile(path,file_name)
 	mov = aviread(fullfile(path,file_name));
 
 

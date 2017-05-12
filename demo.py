@@ -1,4 +1,7 @@
-from init import predict
+"""This module will generate the results as shown in the paper."""
+
+
+from init import predict, print_incorrect_files
 import os
 import numpy as np
 
@@ -13,7 +16,9 @@ y_test = np.load(os.path.join(save_path, 'ytest.npy'))
 
 print()
 print('Method', method)
-predict(x_train_bow, x_test_bow, y_train, y_test)
+predictions = predict(x_train_bow, x_test_bow, y_train, y_test)
+print()
+print_incorrect_files(predictions, y_test, save_path)
 print()
 
 method = 'max'
@@ -24,4 +29,6 @@ y_train = np.load(os.path.join(save_path, 'ytrain.npy'))
 y_test = np.load(os.path.join(save_path, 'ytest.npy'))
 
 print('Method', method)
-predict(x_train_bow, x_test_bow, y_train, y_test)
+predictions = predict(x_train_bow, x_test_bow, y_train, y_test)
+print()
+print_incorrect_files(predictions, y_test, save_path)
