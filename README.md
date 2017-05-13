@@ -64,3 +64,5 @@ Get ViF to work. Matlab cannot open AVI files on Mac, so I need to investigate a
 ## License
 
 This project is licensed under the Apache License - see the [LICENSE.md](LICENSE.md) file for details
+
+Will be taken down by faculty or department request.
